@@ -55,11 +55,11 @@ func NewDfaModel() *DfaModel {
 
 func (m *DfaModel) AddWords(words ...string) {
 	for _, word := range words {
-		m.AddWord(word)
+		m.addWord(word)
 	}
 }
 
-func (m *DfaModel) AddWord(word string) {
+func (m *DfaModel) addWord(word string) {
 	now := m.root
 	runes := []rune(word)
 
@@ -76,11 +76,11 @@ func (m *DfaModel) AddWord(word string) {
 
 func (m *DfaModel) DelWords(words ...string) {
 	for _, word := range words {
-		m.DelWord(word)
+		m.delWord(word)
 	}
 }
 
-func (m *DfaModel) DelWord(word string) {
+func (m *DfaModel) delWord(word string) {
 	var lastLeaf *dfaNode
 	var lastLeafNextRune rune
 	now := m.root
@@ -105,13 +105,13 @@ func (m *DfaModel) DelWord(word string) {
 func (m *DfaModel) Listen(addChan, delChan <-chan string) {
 	go func() {
 		for word := range addChan {
-			m.AddWord(word)
+			m.addWord(word)
 		}
 	}()
 
 	go func() {
 		for word := range delChan {
-			m.DelWord(word)
+			m.delWord(word)
 		}
 	}()
 }

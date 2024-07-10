@@ -28,7 +28,7 @@ func (n *acNode) getChild(r rune) (*acNode, bool) {
 	n.lock.RLock()
 	defer n.lock.RUnlock()
 
-	child, ok := n.getChild(r)
+	child, ok := n.children[r]
 
 	return child, ok
 }
@@ -60,13 +60,13 @@ func NewAcModel() *AcModel {
 
 func (m *AcModel) AddWords(words ...string) {
 	for _, word := range words {
-		m.AddWord(word)
+		m.addWord(word)
 	}
 
 	m.buildFailPointers()
 }
 
-func (m *AcModel) AddWord(word string) {
+func (m *AcModel) addWord(word string) {
 	now := m.root
 	runes := []rune(word)
 
@@ -84,13 +84,13 @@ func (m *AcModel) AddWord(word string) {
 
 func (m *AcModel) DelWords(words ...string) {
 	for _, word := range words {
-		m.DelWord(word)
+		m.delWord(word)
 	}
 
 	m.buildFailPointers()
 }
 
-func (m *AcModel) DelWord(word string) {
+func (m *AcModel) delWord(word string) {
 	var lastLeaf *acNode
 	var lastLeafNextRune rune
 	now := m.root
