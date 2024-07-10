@@ -3,11 +3,12 @@ package store
 import (
 	"bufio"
 	"errors"
-	"github.com/imroc/req/v3"
-	cmap "github.com/orcaman/concurrent-map/v2"
 	"io"
 	"net/http"
 	"os"
+
+	"github.com/imroc/req/v3"
+	cmap "github.com/orcaman/concurrent-map/v2"
 )
 
 type MemoryModel struct {
@@ -19,8 +20,8 @@ type MemoryModel struct {
 func NewMemoryModel() *MemoryModel {
 	return &MemoryModel{
 		store:   cmap.New[struct{}](),
-		addChan: make(chan string),
-		delChan: make(chan string),
+		addChan: make(chan string, 1000),
+		delChan: make(chan string, 1000),
 	}
 }
 

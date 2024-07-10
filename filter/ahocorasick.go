@@ -147,25 +147,19 @@ func (m *AcModel) buildFailPointers() {
 
 func (m *AcModel) Listen(addChan, delChan <-chan string) {
 	go func() {
-		var words []string
-
 		for word := range addChan {
-			words = append(words, word)
+			m.addWord(word)
 			if len(addChan) == 0 {
-				m.AddWords(words...)
-				word = word[:0]
+				m.buildFailPointers()
 			}
 		}
 	}()
 
 	go func() {
-		var words []string
-
 		for word := range delChan {
-			words = append(words, word)
+			m.delWord(word)
 			if len(delChan) == 0 {
-				m.DelWords(words...)
-				word = word[:0]
+				m.buildFailPointers()
 			}
 		}
 	}()
