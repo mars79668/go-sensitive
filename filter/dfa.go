@@ -1,8 +1,39 @@
 package filter
 
+import (
+	"sync"
+)
+
 type dfaNode struct {
 	children map[rune]*dfaNode
+	lock     sync.RWMutex
 	isLeaf   bool
+}
+
+func (n *dfaNode) addChild(r rune) *dfaNode {
+	n.lock.Lock()
+	defer n.lock.Unlock()
+
+	newChile := newDfaNode()
+	n.children[r] = newChile
+
+	return newChile
+}
+
+func (n *dfaNode) getChild(r rune) (*dfaNode, bool) {
+	n.lock.RLock()
+	defer n.lock.RUnlock()
+
+	child, ok := n.children[r]
+
+	return child, ok
+}
+
+func (n *dfaNode) delChild(r rune) {
+	n.lock.Lock()
+	defer n.lock.Unlock()
+
+	delete(n.children, r)
 }
 
 func newDfaNode() *dfaNode {
@@ -36,9 +67,7 @@ func (m *DfaModel) AddWord(word string) {
 		if next, ok := now.children[r]; ok {
 			now = next
 		} else {
-			next = newDfaNode()
-			now.children[r] = next
-			now = next
+			now = now.addChild(r)
 		}
 	}
 
@@ -58,7 +87,7 @@ func (m *DfaModel) DelWord(word string) {
 	runes := []rune(word)
 
 	for _, r := range runes {
-		if next, ok := now.children[r]; !ok {
+		if next, ok := now.getChild(r); !ok {
 			return
 		} else {
 			if next.isLeaf {
@@ -69,7 +98,7 @@ func (m *DfaModel) DelWord(word string) {
 		}
 	}
 	if lastLeaf != nil {
-		delete(lastLeaf.children, lastLeafNextRune)
+		lastLeaf.delChild(lastLeafNextRune)
 	}
 }
 
@@ -98,7 +127,7 @@ func (m *DfaModel) FindAll(text string) []string {
 	length := len(runes)
 
 	for pos := 0; pos < length; pos++ {
-		now, found = parent.children[runes[pos]]
+		now, found = parent.getChild(runes[pos])
 
 		if !found {
 			parent = m.root
@@ -145,7 +174,7 @@ func (m *DfaModel) FindAllCount(text string) map[string]int {
 	length := len(runes)
 
 	for pos := 0; pos < length; pos++ {
-		now, found = parent.children[runes[pos]]
+		now, found = parent.getChild(runes[pos])
 
 		if !found {
 			parent = m.root
@@ -181,7 +210,7 @@ func (m *DfaModel) FindOne(text string) string {
 	length := len(runes)
 
 	for pos := 0; pos < length; pos++ {
-		now, found = parent.children[runes[pos]]
+		now, found = parent.getChild(runes[pos])
 
 		if !found || (!now.isLeaf && pos == length-1) {
 			parent = m.root
@@ -214,7 +243,7 @@ func (m *DfaModel) Replace(text string, repl rune) string {
 	length := len(runes)
 
 	for pos := 0; pos < length; pos++ {
-		now, found = parent.children[runes[pos]]
+		now, found = parent.getChild(runes[pos])
 
 		if !found || (!now.isLeaf && pos == length-1) {
 			parent = m.root
@@ -246,7 +275,7 @@ func (m *DfaModel) Remove(text string) string {
 	filtered := make([]rune, 0, length)
 
 	for pos := 0; pos < length; pos++ {
-		now, found = parent.children[runes[pos]]
+		now, found = parent.getChild(runes[pos])
 
 		if !found || (!now.isLeaf && pos == length-1) {
 			filtered = append(filtered, runes[start])

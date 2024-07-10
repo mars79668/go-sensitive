@@ -1,14 +1,43 @@
 package filter
 
 import (
+	"sync"
+
 	"github.com/sgoware/ds/queue/arrayqueue"
 )
 
 type acNode struct {
 	value    rune
 	children map[rune]*acNode
+	lock     sync.RWMutex
 	word     *string
 	fail     *acNode
+}
+
+func (n *acNode) addChild(r rune) *acNode {
+	n.lock.Lock()
+	defer n.lock.Unlock()
+
+	newChile := newAcNode(r)
+	n.children[r] = newChile
+
+	return newChile
+}
+
+func (n *acNode) getChild(r rune) (*acNode, bool) {
+	n.lock.RLock()
+	defer n.lock.RUnlock()
+
+	child, ok := n.getChild(r)
+
+	return child, ok
+}
+
+func (n *acNode) delChild(r rune) {
+	n.lock.Lock()
+	defer n.lock.Unlock()
+
+	delete(n.children, r)
 }
 
 func newAcNode(r rune) *acNode {
@@ -42,12 +71,10 @@ func (m *AcModel) AddWord(word string) {
 	runes := []rune(word)
 
 	for _, r := range runes {
-		if next, ok := now.children[r]; ok {
+		if next, ok := now.getChild(r); ok {
 			now = next
 		} else {
-			next = newAcNode(r)
-			now.children[r] = next
-			now = next
+			now = now.addChild(r)
 		}
 	}
 
@@ -70,7 +97,7 @@ func (m *AcModel) DelWord(word string) {
 	runes := []rune(word)
 
 	for _, r := range runes {
-		if next, ok := now.children[r]; !ok {
+		if next, ok := now.getChild(r); !ok {
 			return
 		} else {
 			if next.word != nil {
@@ -82,7 +109,7 @@ func (m *AcModel) DelWord(word string) {
 	}
 
 	if lastLeaf != nil {
-		delete(lastLeaf.children, lastLeafNextRune)
+		lastLeaf.delChild(lastLeafNextRune)
 	}
 }
 
@@ -92,25 +119,29 @@ func (m *AcModel) buildFailPointers() {
 	for q.Len() > 0 {
 		temp, _ := q.Top()
 		q.Pop()
-		for _, node := range temp.(*acNode).children {
-			if temp.(*acNode) == m.root {
-				node.fail = m.root
-			} else {
-				p := temp.(*acNode).fail
-				for p != nil {
-					if next, found := p.children[node.value]; found {
-						node.fail = next
-						break
-					}
-					p = p.fail
-				}
-				if p == nil {
+		tmpAcNode := temp.(*acNode)
+		func() {
+			tmpAcNode.lock.RLock()
+			defer tmpAcNode.lock.RUnlock()
+			for _, node := range tmpAcNode.children {
+				if tmpAcNode == m.root {
 					node.fail = m.root
+				} else {
+					p := tmpAcNode.fail
+					for p != nil {
+						if next, found := p.children[node.value]; found {
+							node.fail = next
+							break
+						}
+						p = p.fail
+					}
+					if p == nil {
+						node.fail = m.root
+					}
 				}
+				q.Push(node)
 			}
-
-			q.Push(node)
-		}
+		}()
 	}
 }
 
@@ -149,16 +180,16 @@ func (m *AcModel) FindAll(text string) []string {
 	runes := []rune(text)
 
 	for pos := 0; pos < len(runes); pos++ {
-		_, found = now.children[runes[pos]]
+		_, found = now.getChild(runes[pos])
 		if !found && now != m.root {
 			now = now.fail
-			for ; !found && now != m.root; now, found = now.children[runes[pos]] {
+			for ; !found && now != m.root; now, found = now.getChild(runes[pos]) {
 				now = now.fail
 			}
 		}
 
 		// 若找到匹配成功的字符串结点, 则指向那个结点, 否则指向根结点
-		if next, ok := now.children[runes[pos]]; ok {
+		if next, ok := now.getChild(runes[pos]); ok {
 			now = next
 		} else {
 			now = m.root
@@ -196,16 +227,16 @@ func (m *AcModel) FindAllCount(text string) map[string]int {
 	runes := []rune(text)
 
 	for pos := 0; pos < len(runes); pos++ {
-		_, found = now.children[runes[pos]]
+		_, found = now.getChild(runes[pos])
 		if !found && now != m.root {
 			now = now.fail
-			for ; !found && now != m.root; now, found = now.children[runes[pos]] {
+			for ; !found && now != m.root; now, found = now.getChild(runes[pos]) {
 				now = now.fail
 			}
 		}
 
 		// 若找到匹配成功的字符串结点, 则指向那个结点, 否则指向根结点
-		if next, ok := now.children[runes[pos]]; ok {
+		if next, ok := now.getChild(runes[pos]); ok {
 			now = next
 		} else {
 			now = m.root
@@ -232,16 +263,16 @@ func (m *AcModel) FindOne(text string) string {
 	runes := []rune(text)
 
 	for pos := 0; pos < len(runes); pos++ {
-		_, found = now.children[runes[pos]]
+		_, found = now.getChild(runes[pos])
 		if !found && now != m.root {
 			now = now.fail
-			for ; !found && now != m.root; now, found = now.children[runes[pos]] {
+			for ; !found && now != m.root; now, found = now.getChild(runes[pos]) {
 				now = now.fail
 			}
 		}
 
 		// 若找到匹配成功的字符串结点, 则指向那个结点, 否则指向根结点
-		if next, ok := now.children[runes[pos]]; ok {
+		if next, ok := now.getChild(runes[pos]); ok {
 			now = next
 		} else {
 			now = m.root
@@ -272,16 +303,16 @@ func (m *AcModel) Replace(text string, repl rune) string {
 	runes := []rune(text)
 
 	for pos := 0; pos < len(runes); pos++ {
-		_, found = now.children[runes[pos]]
+		_, found = now.getChild(runes[pos])
 		if !found && now != m.root {
 			now = now.fail
-			for ; !found && now != m.root; now, found = now.children[runes[pos]] {
+			for ; !found && now != m.root; now, found = now.getChild(runes[pos]) {
 				now = now.fail
 			}
 		}
 
 		// 若找到匹配成功的字符串结点, 则指向那个结点, 否则指向根结点
-		if next, ok := now.children[runes[pos]]; ok {
+		if next, ok := now.getChild(runes[pos]); ok {
 			now = next
 		} else {
 			now = m.root
@@ -310,16 +341,16 @@ func (m *AcModel) Remove(text string) string {
 	runes := []rune(text)
 
 	for pos := 0; pos < len(runes); pos++ {
-		_, found = now.children[runes[pos]]
+		_, found = now.getChild(runes[pos])
 		if !found && now != m.root {
 			now = now.fail
-			for ; !found && now != m.root; now, found = now.children[runes[pos]] {
+			for ; !found && now != m.root; now, found = now.getChild(runes[pos]) {
 				now = now.fail
 			}
 		}
 
 		// 若找到匹配成功的字符串结点, 则指向那个结点, 否则指向根结点
-		if next, ok := now.children[runes[pos]]; ok {
+		if next, ok := now.getChild(runes[pos]); ok {
 			now = next
 		} else {
 			now = m.root
