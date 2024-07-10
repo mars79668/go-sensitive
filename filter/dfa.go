@@ -61,15 +61,16 @@ func (m *DfaModel) DelWord(word string) {
 		if next, ok := now.children[r]; !ok {
 			return
 		} else {
-			if now.isLeaf {
+			if next.isLeaf {
 				lastLeaf = now
 				lastLeafNextRune = r
 			}
 			now = next
 		}
 	}
-
-	delete(lastLeaf.children, lastLeafNextRune)
+	if lastLeaf != nil {
+		delete(lastLeaf.children, lastLeafNextRune)
+	}
 }
 
 func (m *DfaModel) Listen(addChan, delChan <-chan string) {

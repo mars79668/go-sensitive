@@ -73,7 +73,7 @@ func (m *AcModel) DelWord(word string) {
 		if next, ok := now.children[r]; !ok {
 			return
 		} else {
-			if now.word != nil {
+			if next.word != nil {
 				lastLeaf = now
 				lastLeafNextRune = r
 			}
@@ -81,7 +81,9 @@ func (m *AcModel) DelWord(word string) {
 		}
 	}
 
-	delete(lastLeaf.children, lastLeafNextRune)
+	if lastLeaf != nil {
+		delete(lastLeaf.children, lastLeafNextRune)
+	}
 }
 
 func (m *AcModel) buildFailPointers() {
