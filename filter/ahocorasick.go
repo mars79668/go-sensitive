@@ -129,7 +129,7 @@ func (m *AcModel) buildFailPointers() {
 				} else {
 					p := tmpAcNode.fail
 					for p != nil {
-						if next, found := p.children[node.value]; found {
+						if next, found := p.getChild(node.value); found {
 							node.fail = next
 							break
 						}
@@ -181,15 +181,21 @@ func (m *AcModel) FindAll(text string) []string {
 
 	for pos := 0; pos < len(runes); pos++ {
 		_, found = now.getChild(runes[pos])
-		if !found && now != m.root {
+		if !found && now != nil && now != m.root {
 			now = now.fail
-			for ; !found && now != m.root; now, found = now.getChild(runes[pos]) {
+			for ; !found && now != nil && now != m.root; now, found = now.getChild(runes[pos]) {
 				now = now.fail
 			}
 		}
 
 		// 若找到匹配成功的字符串结点, 则指向那个结点, 否则指向根结点
-		if next, ok := now.getChild(runes[pos]); ok {
+		var next *acNode
+		var ok bool
+
+		if now != nil {
+			next, ok = now.getChild(runes[pos])
+		}
+		if ok {
 			now = next
 		} else {
 			now = m.root
@@ -197,7 +203,7 @@ func (m *AcModel) FindAll(text string) []string {
 
 		temp = now
 
-		for temp != m.root {
+		for temp != nil && temp != m.root {
 			if temp.word != nil {
 				matches = append(matches, *temp.word)
 			}
