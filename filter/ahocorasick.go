@@ -49,7 +49,8 @@ func newAcNode(r rune) *acNode {
 }
 
 type AcModel struct {
-	root *acNode
+	root   *acNode
+	status int
 }
 
 func NewAcModel() *AcModel {
@@ -145,12 +146,18 @@ func (m *AcModel) buildFailPointers() {
 	}
 }
 
+func (m *AcModel) LoadStatus() int {
+	return m.status
+}
+
 func (m *AcModel) Listen(addChan, delChan <-chan string) {
 	go func() {
 		for word := range addChan {
 			m.addWord(word)
+			m.status = DICT_LOADING
 			if len(addChan) == 0 {
 				m.buildFailPointers()
+				m.status = DICT_LOAD_OVER
 			}
 		}
 	}()
@@ -158,8 +165,10 @@ func (m *AcModel) Listen(addChan, delChan <-chan string) {
 	go func() {
 		for word := range delChan {
 			m.delWord(word)
+			m.status = DICT_LOADING
 			if len(delChan) == 0 {
 				m.buildFailPointers()
+				m.status = DICT_LOAD_OVER
 			}
 		}
 	}()

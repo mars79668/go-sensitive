@@ -14,7 +14,15 @@ type (
 		Replace(text string, repl rune) string
 		// Remove 过滤铭感词
 		Remove(text string) string
+
+		// LoadStatus 加载状态
+		LoadStatus() int
 	}
 )
 
 type searchHandler func(pos int, word string) bool
+
+const (
+	DICT_LOADING   = 1
+	DICT_LOAD_OVER = 2
+)

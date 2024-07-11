@@ -44,7 +44,8 @@ func newDfaNode() *dfaNode {
 }
 
 type DfaModel struct {
-	root *dfaNode
+	root   *dfaNode
+	status int
 }
 
 func NewDfaModel() *DfaModel {
@@ -102,16 +103,28 @@ func (m *DfaModel) delWord(word string) {
 	}
 }
 
+func (m *DfaModel) LoadStatus() int {
+	return m.status
+}
+
 func (m *DfaModel) Listen(addChan, delChan <-chan string) {
 	go func() {
 		for word := range addChan {
 			m.addWord(word)
+			m.status = DICT_LOADING
+			if len(addChan) == 0 {
+				m.status = DICT_LOAD_OVER
+			}
 		}
 	}()
 
 	go func() {
 		for word := range delChan {
 			m.delWord(word)
+			m.status = DICT_LOADING
+			if len(addChan) == 0 {
+				m.status = DICT_LOAD_OVER
+			}
 		}
 	}()
 }
