@@ -16,3 +16,5 @@ type (
 		Remove(text string) string
 	}
 )
+
+type searchHandler func(pos int, word string) bool

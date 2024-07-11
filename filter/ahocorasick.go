@@ -166,11 +166,69 @@ func (m *AcModel) Listen(addChan, delChan <-chan string) {
 }
 
 func (m *AcModel) FindAll(text string) []string {
-	var matches []string
+	allCount := m.FindAllCount(text)
+	var res []string
+	for word, _ := range allCount {
+		res = append(res, word)
+	}
+	return res
+}
+
+func (m *AcModel) FindAllCount(text string) map[string]int {
+	res := make(map[string]int)
+	m.search(text,
+		func(pos int, word string) bool {
+			res[word]++
+			return false
+		})
+	return res
+}
+
+func (m *AcModel) FindOne(text string) string {
+	var res string
+
+	m.search(text,
+		func(pos int, word string) bool {
+			res = word
+			return true
+		})
+	return res
+}
+
+func (m *AcModel) IsSensitive(text string) bool {
+	return m.FindOne(text) != ""
+}
+
+func (m *AcModel) Replace(text string, repl rune) string {
+	runes := []rune(text)
+	m.search(text,
+		func(pos int, word string) bool {
+			wr := []rune(word)
+			for i := pos - len(wr) + 1; i <= pos; i++ {
+				runes[i] = repl
+			}
+			return false
+		})
+	return string(runes)
+}
+
+func (m *AcModel) Remove(text string) string {
+	runes := []rune(text)
+	var res []rune
+	m.search(text,
+		func(pos int, word string) bool {
+			wr := []rune(word)
+			res = append(runes[:pos-len(wr)+1], runes[pos+1:]...)
+			return false
+		})
+	return string(res)
+}
+
+func (m *AcModel) search(text string, handler searchHandler) {
 	var found bool
+	var temp *acNode
 
 	now := m.root
-	var temp *acNode
 	runes := []rune(text)
 
 	for pos := 0; pos < len(runes); pos++ {
@@ -199,173 +257,12 @@ func (m *AcModel) FindAll(text string) []string {
 
 		for temp != nil && temp != m.root {
 			if temp.word != nil {
-				matches = append(matches, *temp.word)
-			}
-			temp = temp.fail
-		}
-	}
-
-	var res []string
-	set := make(map[string]struct{})
-
-	for _, word := range matches {
-		if _, ok := set[word]; !ok {
-			set[word] = struct{}{}
-			res = append(res, word)
-		}
-	}
-
-	return res
-}
-
-func (m *AcModel) FindAllCount(text string) map[string]int {
-	res := make(map[string]int)
-	var found bool
-	var temp *acNode
-
-	now := m.root
-	runes := []rune(text)
-
-	for pos := 0; pos < len(runes); pos++ {
-		_, found = now.getChild(runes[pos])
-		if !found && now != m.root {
-			now = now.fail
-			for ; !found && now != m.root; now, found = now.getChild(runes[pos]) {
-				now = now.fail
-			}
-		}
-
-		// 若找到匹配成功的字符串结点, 则指向那个结点, 否则指向根结点
-		if next, ok := now.getChild(runes[pos]); ok {
-			now = next
-		} else {
-			now = m.root
-		}
-
-		temp = now
-
-		for temp != m.root {
-			if temp.word != nil {
-				res[*temp.word]++
-			}
-			temp = temp.fail
-		}
-	}
-
-	return res
-}
-
-func (m *AcModel) FindOne(text string) string {
-	var found bool
-	var temp *acNode
-
-	now := m.root
-	runes := []rune(text)
-
-	for pos := 0; pos < len(runes); pos++ {
-		_, found = now.getChild(runes[pos])
-		if !found && now != m.root {
-			now = now.fail
-			for ; !found && now != m.root; now, found = now.getChild(runes[pos]) {
-				now = now.fail
-			}
-		}
-
-		// 若找到匹配成功的字符串结点, 则指向那个结点, 否则指向根结点
-		if next, ok := now.getChild(runes[pos]); ok {
-			now = next
-		} else {
-			now = m.root
-		}
-
-		temp = now
-
-		for temp != m.root {
-			if temp.word != nil {
-				return *temp.word
-			}
-			temp = temp.fail
-		}
-	}
-
-	return ""
-}
-
-func (m *AcModel) IsSensitive(text string) bool {
-	return m.FindOne(text) != ""
-}
-
-func (m *AcModel) Replace(text string, repl rune) string {
-	var found bool
-	var temp *acNode
-
-	now := m.root
-	runes := []rune(text)
-
-	for pos := 0; pos < len(runes); pos++ {
-		_, found = now.getChild(runes[pos])
-		if !found && now != m.root {
-			now = now.fail
-			for ; !found && now != m.root; now, found = now.getChild(runes[pos]) {
-				now = now.fail
-			}
-		}
-
-		// 若找到匹配成功的字符串结点, 则指向那个结点, 否则指向根结点
-		if next, ok := now.getChild(runes[pos]); ok {
-			now = next
-		} else {
-			now = m.root
-		}
-
-		temp = now
-
-		for temp != m.root {
-			if temp.word != nil {
-				for i := pos - len([]rune(*temp.word)) + 1; i <= pos; i++ {
-					runes[i] = repl
+				isBreak := handler(pos, *temp.word)
+				if isBreak {
+					return
 				}
 			}
 			temp = temp.fail
 		}
 	}
-
-	return string(runes)
-}
-
-func (m *AcModel) Remove(text string) string {
-	var found bool
-	var temp *acNode
-
-	now := m.root
-	runes := []rune(text)
-
-	for pos := 0; pos < len(runes); pos++ {
-		_, found = now.getChild(runes[pos])
-		if !found && now != m.root {
-			now = now.fail
-			for ; !found && now != m.root; now, found = now.getChild(runes[pos]) {
-				now = now.fail
-			}
-		}
-
-		// 若找到匹配成功的字符串结点, 则指向那个结点, 否则指向根结点
-		if next, ok := now.getChild(runes[pos]); ok {
-			now = next
-		} else {
-			now = m.root
-		}
-
-		temp = now
-
-		for temp != m.root {
-			if temp.word != nil {
-				runes = append(runes[:pos-len([]rune(*temp.word))+1], runes[pos+1:]...)
-				pos -= len([]rune(*temp.word))
-			}
-			temp = temp.fail
-		}
-	}
-
-	return string(runes)
 }
